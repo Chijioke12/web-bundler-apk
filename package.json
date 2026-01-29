@@ -1,0 +1,28 @@
+{
+  "name": "com.chijioke.webbundler",
+  "displayName": "Web Bundler Pro",
+  "version": "1.0.0",
+  "description": "Bundle Localhost Websites to Offline HTML",
+  "main": "index.js",
+  "keywords": [
+    "ecosystem:cordova"
+  ],
+  "author": "Chijioke",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "cordova-android": "^13.0.0",
+    "cordova-plugin-android-permissions": "^1.1.5",
+    "cordova-plugin-file": "^8.0.0",
+    "cordova-plugin-whitelist": "^1.3.4"
+  },
+  "cordova": {
+    "plugins": {
+      "cordova-plugin-file": {},
+      "cordova-plugin-android-permissions": {},
+      "cordova-plugin-whitelist": {}
+    },
+    "platforms": [
+      "android"
+    ]
+  }
+}

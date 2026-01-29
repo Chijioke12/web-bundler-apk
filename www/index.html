@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <!-- CSP: Allow all connections for bundling -->
+    <meta http-equiv="Content-Security-Policy" content="default-src * 'self' 'unsafe-inline' 'unsafe-eval' data: gap: content: blob: filesystem:;">
+    <title>Web Bundler APK</title>
+    
+    <script src="cordova.js"></script>
+
+    <!-- CUSTOM OFFLINE CSS -->
+    <style>
+        :root {
+            --bg-color: #020617;
+            --surface-color: #0f172a;
+            --border-color: #1e293b;
+            --primary-color: #3b82f6; /* Blue 500 */
+            --primary-hover: #2563eb;
+            --text-main: #e2e8f0;
+            --text-muted: #94a3b8;
+            --success: #22c55e;
+            --error: #ef4444;
+            --input-bg: #0f172a;
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* HEADER */
+        header {
+            background-color: var(--surface-color);
+            border-bottom: 1px solid var(--border-color);
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+            z-index: 10;
+        }
+
+        h1 { margin: 0; font-size: 1.1rem; font-weight: 700; color: #60a5fa; display: flex; align-items: center; }
+        .badge { background-color: #1e3a8a; color: #bfdbfe; font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; margin-left: 8px; }
+
+        /* REFRESH BUTTON */
+        .btn-icon {
+            background: transparent; border: none; color: var(--text-muted); padding: 8px;
+            border-radius: 50%; cursor: pointer; transition: all 0.2s;
+        }
+        .btn-icon:active { background-color: var(--border-color); color: var(--text-main); transform: rotate(180deg); }
+
+        /* MAIN CONTENT */
+        main { flex-grow: 1; padding: 1rem; overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; gap: 1.5rem; }
+
+        /* STATUS BOX */
+        .status-box {
+            background-color: var(--surface-color); border: 1px solid var(--border-color);
+            color: var(--text-muted); font-size: 0.8rem; padding: 0.75rem; text-align: center; border-radius: 8px;
+        }
+        .status-success { background-color: rgba(34, 197, 94, 0.1); border-color: rgba(34, 197, 94, 0.3); color: var(--success); }
+        .status-error { background-color: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.3); color: var(--error); }
+
+        /* PROGRESS BAR */
+        .progress-track { background-color: var(--border-color); height: 8px; border-radius: 4px; overflow: hidden; display: none; }
+        .progress-fill { background-color: var(--primary-color); height: 100%; width: 0%; transition: width 0.3s ease; }
+
+        /* LOG */
+        .log-container {
+            background-color: #000; border: 1px solid var(--border-color); border-radius: 8px;
+            height: 200px; padding: 10px; overflow-y: auto; font-family: monospace; font-size: 0.7rem; color: #cbd5e1;
+        }
+        .log-item { margin-bottom: 4px; word-break: break-all; }
+        .log-red { color: #f87171; }
+        .log-blue { color: #60a5fa; }
+        .log-green { color: #4ade80; }
+        .log-yellow { color: #facc15; }
+
+        /* FORMS */
+        .form-group { margin-bottom: 0.5rem; }
+        label { display: block; font-size: 0.7rem; font-weight: 700; color: var(--text-muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+        
+        input {
+            width: 100%; background-color: var(--input-bg); border: 1px solid var(--border-color);
+            color: var(--text-main); padding: 12px; border-radius: 8px; outline: none; font-size: 0.9rem;
+            transition: border-color 0.2s;
+        }
+        input:focus { border-color: var(--primary-color); }
+        .helper-text { font-size: 0.7rem; color: #64748b; margin-top: 4px; }
+
+        /* BUTTONS */
+        .btn-primary {
+            width: 100%; background-color: var(--primary-color); color: white; border: none;
+            padding: 16px; border-radius: 12px; font-weight: 700; font-size: 1rem;
+            box-shadow: 0 4px 6px rgba(59, 130, 246, 0.3); transition: transform 0.1s;
+        }
+        .btn-primary:active { transform: scale(0.98); background-color: var(--primary-hover); }
+        .btn-primary:disabled { opacity: 0.5; pointer-events: none; }
+
+        /* MODAL */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.8); z-index: 50; display: none;
+            align-items: center; justify-content: center; padding: 20px;
+        }
+        .modal-box {
+            background: var(--surface-color); border: 1px solid var(--border-color);
+            width: 100%; max-width: 350px; padding: 20px; border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
+        .modal-title { font-size: 1.1rem; font-weight: bold; margin-bottom: 10px; color: var(--text-main); }
+        .modal-desc { font-size: 0.9rem; color: var(--text-muted); margin-bottom: 15px; }
+        .modal-actions { display: flex; gap: 10px; margin-top: 15px; }
+        .btn-secondary { flex: 1; padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: transparent; color: var(--text-main); font-weight: 600; }
+        .btn-accent { flex: 1; padding: 10px; border-radius: 8px; border: none; background: var(--primary-color); color: white; font-weight: 600; }
+    </style>
+</head>
+<body>
+
+    <!-- Header -->
+    <header>
+        <h1>Web Bundler <span class="badge">APK</span></h1>
+        <button onclick="window.location.reload()" class="btn-icon" title="Refresh App">
+            <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+        </button>
+    </header>
+
+    <!-- Main Content -->
+    <main>
+        <div id="statusBox" class="status-box">System Ready</div>
+
+        <!-- Progress -->
+        <div id="progressContainer" class="progress-track">
+            <div id="progressBar" class="progress-fill"></div>
+        </div>
+
+        <!-- Log -->
+        <div class="log-container" id="log"></div>
+
+        <!-- Inputs -->
+        <div style="display: flex; flex-direction: column; gap: 1rem;">
+            <div class="form-group">
+                <label>Project URL (Localhost)</label>
+                <input type="text" id="urlInput" placeholder="http://192.168.x.x:8080/index.html" />
+                <div class="helper-text">Enter the full address of your local site.</div>
+            </div>
+
+            <div class="form-group">
+                <label>Output File Name</label>
+                <input type="text" id="fileNameInput" placeholder="my-website" style="color: #60a5fa; font-weight: bold;" />
+                <div class="helper-text">Saves to Download/WebBundler/</div>
+            </div>
+
+            <button onclick="startProcess()" id="btnStart" class="btn-primary">
+                Bundle & Save
+            </button>
+        </div>
+    </main>
+
+    <!-- FILE EXISTS MODAL -->
+    <div id="fileModal" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-title">File Already Exists</div>
+            <div class="modal-desc">
+                A file named <span id="modalFileName" style="color: #fff; font-family: monospace;"></span> already exists.
+                <br><br>
+                Rename it below, or simply click "Confirm Save" to auto-number it (e.g. site(1).html).
+            </div>
+            <div class="form-group">
+                <label>File Name</label>
+                <input type="text" id="modalInput" value="" />
+            </div>
+            <div class="modal-actions">
+                <button onclick="closeModal()" class="btn-secondary">Cancel</button>
+                <button onclick="confirmFileSave()" class="btn-accent">Confirm Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- VARIABLES ---
+        let finalHtml = "";
+        let isDeviceReady = false;
+        let pendingSaveDir = null; 
+        let originalAttemptName = ""; 
+
+        const logEl = document.getElementById('log');
+        const statusBox = document.getElementById('statusBox');
+        const btnStart = document.getElementById('btnStart');
+        const progressBar = document.getElementById('progressBar');
+        const progressContainer = document.getElementById('progressContainer');
+        const fileModal = document.getElementById('fileModal');
+        const modalInput = document.getElementById('modalInput');
+        const modalFileName = document.getElementById('modalFileName');
+
+        // --- UTILS ---
+        function addLog(msg, type = '') {
+            const div = document.createElement('div');
+            div.className = `log-item ${type}`;
+            div.innerText = `> ${msg}`;
+            logEl.appendChild(div);
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        function setProgress(percent) {
+            progressContainer.style.display = 'block';
+            progressBar.style.width = percent + '%';
+        }
+
+        document.addEventListener('deviceready', () => { 
+            isDeviceReady = true; 
+            addLog("Cordova Plugins Loaded", "log-green");
+        }, false);
+
+        // --- FETCH LOGIC (APK Version - No Proxy Needed) ---
+        // In APK, standard fetch works for Localhost if config.xml is set correctly
+        async function fetchAsBase64(url) {
+            try {
+                const res = await fetch(url);
+                if (!res.ok) throw new Error(res.status);
+                const blob = await res.blob();
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(reader.result);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(blob);
+                });
+            } catch (e) {
+                addLog(`Asset failed: ${url.split('/').pop()}`, 'log-red');
+                return null;
+            }
+        }
+
+        async function processCSSText(cssText, baseUrl) {
+            const urlRegex = /url\(['"]?(.*?)['"]?\)/g;
+            let processedCss = cssText;
+            const foundUrls = [...cssText.matchAll(urlRegex)];
+
+            for (const match of foundUrls) {
+                let originalUrl = match[1].trim();
+                // Strip quotes if they exist in capture group
+                originalUrl = originalUrl.replace(/['"]/g, '');
+
+                if (originalUrl.startsWith('data:') || originalUrl.startsWith('#') || originalUrl === '') continue;
+                
+                try {
+                    const absoluteUrl = new URL(originalUrl, baseUrl).href;
+                    addLog(`CSS Asset: ${originalUrl}`, 'log-blue');
+                    const b64 = await fetchAsBase64(absoluteUrl);
+                    if (b64) {
+                        processedCss = processedCss.replace(match[0], `url("${b64}")`);
+                    }
+                } catch(e) {}
+            }
+            return processedCss;
+        }
+
+        async function startProcess() {
+            const entryInput = document.getElementById('urlInput').value.trim();
+            const fileName = document.getElementById('fileNameInput').value.trim();
+
+            if (!entryInput) return alert("Please enter URL");
+            if (!fileName) return alert("Please enter File Name");
+
+            btnStart.disabled = true;
+            statusBox.textContent = "⏳ Bundling...";
+            statusBox.classList.remove('status-success', 'status-error');
+            logEl.innerHTML = "";
+            setProgress(10);
+
+            try {
+                // 1. Fetch HTML
+                addLog(`Fetching: ${entryInput}`);
+                const response = await fetch(entryInput).catch(e => { throw new Error("Connection Failed. Check IP/Wifi"); });
+                if (!response.ok) throw new Error(`HTTP Error ${response.status}`);
+                
+                const htmlText = await response.text();
+                setProgress(30);
+
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(htmlText, 'text/html');
+                const base = new URL(entryInput);
+
+                // 2. PROCESS STYLESHEETS
+                const links = doc.querySelectorAll('link[rel="stylesheet"]');
+                for (let link of links) {
+                    const href = link.getAttribute('href');
+                    if (!href) continue;
+                    const fullUrl = new URL(href, base).href;
+                    
+                    try {
+                        const cssRes = await fetch(fullUrl);
+                        const rawCss = await cssRes.text();
+                        const inlinedCss = await processCSSText(rawCss, fullUrl);
+                        
+                        const style = doc.createElement('style');
+                        style.textContent = inlinedCss;
+                        link.parentNode.replaceChild(style, link);
+                        addLog(`Inlined CSS: ${href}`, 'log-green');
+                    } catch (e) { addLog(`CSS Error: ${href}`, 'log-yellow'); }
+                }
+
+                setProgress(50);
+
+                // 3. PROCESS IMAGES
+                const images = doc.querySelectorAll('img, source');
+                for (let img of images) {
+                    const attrs = ['src', 'srcset', 'data-src'];
+                    for (let attr of attrs) {
+                        const val = img.getAttribute(attr);
+                        if (!val) continue;
+
+                        if (attr.includes('srcset')) {
+                            // Basic handling for first item in srcset
+                            const parts = val.split(',');
+                            const firstPart = parts[0].trim().split(' ')[0];
+                            const fullUrl = new URL(firstPart, base).href;
+                            const b64 = await fetchAsBase64(fullUrl);
+                            if(b64) img.setAttribute(attr, b64);
+                        } else {
+                            const fullUrl = new URL(val, base).href;
+                            const b64 = await fetchAsBase64(fullUrl);
+                            if (b64) img.setAttribute(attr, b64);
+                        }
+                    }
+                }
+
+                // 4. PROCESS SCRIPTS
+                const scripts = doc.querySelectorAll('script[src]');
+                for (let script of scripts) {
+                    const src = script.getAttribute('src');
+                    if (!src) continue;
+                    const fullUrl = new URL(src, base).href;
+                    
+                    try {
+                        const jsRes = await fetch(fullUrl);
+                        const jsText = await jsRes.text();
+                        const newScript = doc.createElement('script');
+                        newScript.textContent = jsText;
+                        // Copy attributes
+                        Array.from(script.attributes).forEach(attr => {
+                            if (attr.name !== 'src') newScript.setAttribute(attr.name, attr.value);
+                        });
+                        script.parentNode.replaceChild(newScript, script);
+                        addLog(`Inlined JS: ${src}`, 'log-green');
+                    } catch (e) {}
+                }
+
+                setProgress(80);
+
+                finalHtml = "<!DOCTYPE html>\n" + doc.documentElement.outerHTML;
+                
+                statusBox.textContent = "✅ Bundling Complete";
+                statusBox.classList.add('status-success');
+                addLog("Ready to save.", "log-green");
+                
+                setProgress(90);
+                initiateSaveProcess(fileName);
+
+            } catch (err) {
+                statusBox.textContent = "❌ Error";
+                statusBox.classList.add('status-error');
+                addLog(err.message, 'log-red');
+                setProgress(0);
+            } finally {
+                btnStart.disabled = false;
+            }
+        }
+
+        // --- FILE SAVING LOGIC (Same as React Bundler) ---
+
+        function initiateSaveProcess(name) {
+            if (!isDeviceReady) { alert("Cordova not ready"); return; }
+            let cleanName = name.endsWith('.html') ? name : name + '.html';
+
+            const permissions = cordova.plugins.permissions;
+            permissions.checkPermission(permissions.WRITE_EXTERNAL_STORAGE, (s) => {
+                if (s.hasPermission) checkFileAndSave(cleanName);
+                else permissions.requestPermission(permissions.WRITE_EXTERNAL_STORAGE, () => checkFileAndSave(cleanName), () => addLog("Storage Denied", "log-red"));
+            }, () => addLog("Permission Error", "log-red"));
+        }
+
+        function checkFileAndSave(name) {
+            window.resolveLocalFileSystemURL(cordova.file.externalRootDirectory, function(root) {
+                root.getDirectory("Download", { create: true }, function(dlDir) {
+                    dlDir.getDirectory("WebBundler", { create: true }, function(customDir) { // Changed folder name
+                        
+                        customDir.getFile(name, { create: false }, 
+                            function(fileEntry) {
+                                openModal(customDir, name);
+                            }, 
+                            function(err) {
+                                if(err.code === 1) writeFinalFile(customDir, name);
+                                else addLog("FS Check Error: " + err.code, "log-red");
+                            }
+                        );
+                    }, e => addLog("Dir Error", "log-red"));
+                });
+            }, e => addLog("FS Error", "log-red"));
+        }
+
+        function openModal(directory, fileName) {
+            pendingSaveDir = directory;
+            originalAttemptName = fileName;
+            modalFileName.textContent = fileName;
+            modalInput.value = fileName;
+            fileModal.style.display = 'flex';
+        }
+
+        function closeModal() {
+            fileModal.style.display = 'none';
+        }
+
+        function confirmFileSave() {
+            const newName = modalInput.value.trim();
+            if(!newName) return;
+            closeModal();
+
+            if (newName === originalAttemptName) {
+                addLog("Auto-numbering...", "log-blue");
+                findAvailableNameAndSave(pendingSaveDir, newName, 1);
+            } else {
+                checkFileAndSave(newName);
+            }
+        }
+
+        function findAvailableNameAndSave(dir, baseName, count) {
+            const namePart = baseName.replace('.html', '');
+            const candidate = `${namePart}(${count}).html`;
+
+            dir.getFile(candidate, { create: false }, 
+                function(exists) { findAvailableNameAndSave(dir, baseName, count + 1); },
+                function(err) { writeFinalFile(dir, candidate); }
+            );
+        }
+
+        function writeFinalFile(dirEntry, finalName) {
+            dirEntry.getFile(finalName, { create: true, exclusive: false }, function(fileEntry) {
+                fileEntry.createWriter(function(fileWriter) {
+                    fileWriter.onwriteend = () => {
+                        setProgress(100);
+                        addLog(`✅ Saved as: ${finalName}`, "log-green");
+                        alert(`Success!\nFile saved: ${finalName}`);
+                    };
+                    fileWriter.onerror = (e) => addLog("Write Error", "log-red");
+                    fileWriter.write(new Blob([finalHtml], { type: 'text/html' }));
+                });
+            }, e => addLog("Create Error: " + e.code, "log-red"));
+        }
+    </script>
+</body>
+</html>
