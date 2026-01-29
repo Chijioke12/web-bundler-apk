@@ -7,6 +7,9 @@
     <description>Bundle Localhost Websites to Single HTML</description>
     <content src="index.html" />
     
+    <!-- APP ICON (Must be inside www folder) -->
+    <icon src="www/icon.png" />
+    
     <!-- NETWORK PERMISSIONS -->
     <access origin="*" />
     <allow-navigation href="*" />
